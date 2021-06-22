@@ -55,7 +55,58 @@ with open('Grid/Map_Grid.csv') as file:
 
 
 # ------- Init Variables --------------- #
-player_attacks = False
+player_attacks = False 
+player_y_momentum = 0
+	# How much object will speed up downwards every frame
+gravity = 0.2
+movement_speed = 2
+jump_force = -5.5
+air_timer = 0
+jump_count = 0
+
+player_rect = pygame.Rect((50,50), (player_idle_sprite.get_width(), player_idle_sprite.get_height()))
+
+moving_right = False
+moving_left = False
+
+
+# ------- Functions ------------------- #
+def collision(player, tiles):
+	hit_list = []
+	for tile in tiles:
+		if player.colliderect(tile):
+			hit_list.append(tile)
+
+	return hit_list
+
+
+def move_player(player, movement, tiles):
+	collision_type = {'top' : False, 'bottom' : False, 'right' : False, 'left' : False}
+
+	player.x += movement[0]
+	hit_list = collision(player, tiles)
+	for tile in hit_list:
+		if movement[0] > 0:
+				# Pygame function which can set a side of rectangle to a position
+				# In this case we set right side of player to left side of tile we are colliding with
+			player.right = tile.left
+			collision_type['right'] = True
+		elif movement[0] < 0:
+			player.left = tile.right
+			collision_type['left'] = True
+
+	player.y += movement[1]
+	hit_list = collision(player, tiles)
+	for tile in hit_list:
+		if movement[1] > 0 :
+			player.bottom = tile.top
+			collision_type['bottom'] = True
+		elif movement[1] < 0:
+			player.top = tile.bottom
+			collision_type['top'] = True
+
+	
+	return player, collision_type
 
 
 
@@ -64,6 +115,9 @@ player_attacks = False
 
 # ------- MAIN LOOP ------------------------------------------------------------ #
 while True:
+
+	tile_rects = []
+
 	# --Reset display
 	display.fill(DARK_GREY)
 	
@@ -73,7 +127,6 @@ while True:
 	# --Get mouse pos
 	mouse_x, mouse_y = pygame.mouse.get_pos()
 
-	
 	# --Handle keys/input
 	for event in pygame.event.get():
 		if event.type == pygame.QUIT:
@@ -91,6 +144,24 @@ while True:
 		if event.type == pygame.MOUSEBUTTONUP:
 			player_attacks = False
 
+		# --Movement keys
+		if event.type == pygame.KEYDOWN:
+			if event.key == pygame.K_a or event.key == pygame.K_LEFT:
+				moving_left = True
+			if event.key == pygame.K_d or event.key == pygame.K_RIGHT:
+				moving_right = True
+			# --Jump
+			if event.key == pygame.K_SPACE:
+				if air_timer < 6:
+					player_y_momentum += jump_force
+
+		if event.type == pygame.KEYUP:
+			if event.key == pygame.K_a or event.key == pygame.K_LEFT:
+				moving_left = False
+			if event.key == pygame.K_d or event.key == pygame.K_RIGHT:
+				moving_right = False
+
+
 
 	# --Display tiles
 	for i in range(len(tile_grid)):   # *** FOR LOOP SOMEHOW BROKEN. X ALWAYS SHOWN AS 0 IN THIS CASE
@@ -102,13 +173,41 @@ while True:
 			if int(tile_grid[i][j]) == 1:
 				display.blit(grass_sprite, (j*tile_size_x, i*tile_size_y))
 
+				# Logs position and size (rects) of each tile for use in collision
+			if int(tile_grid[i][j]) != -1:
+				tile_rects.append(pygame.Rect((j*tile_size_x, i*tile_size_y), (tile_size_x, tile_size_y)))
+
 
 	# --Display player 
 	if player_attacks:
-		display.blit(player_attack_sprite, (mouse_x/2 - tile_size_x/2, mouse_y/2 - tile_size_y/2))
+		display.blit(player_attack_sprite, (player_rect.x, player_rect.y))
 	else:										 # Have to divide by two because display is half the
-		display.blit(player_idle_sprite, (mouse_x/2 - tile_size_x/2, mouse_y/2 - tile_size_y/2)) # size of screen and is just scaled to screen size
+		display.blit(player_idle_sprite, (player_rect.x, player_rect.y)) # size of screen and is just scaled to screen size
 
+
+	# --Player movement
+	player_movement = [0, 0]
+	if moving_right:
+		player_movement[0] += movement_speed
+	elif moving_left:
+		player_movement[0] -= movement_speed
+		# --Gravity
+	player_movement[1] += player_y_momentum
+	player_y_momentum += gravity
+			# --Caps falling speed
+	if player_y_momentum > 5:
+		player_y_momentum = 5
+
+	player_rect, collisions = move_player(player_rect, player_movement, tile_rects)
+
+		# --Jumping
+	if collisions['bottom']:
+		player_y_momentum = 0
+		air_timer = 0
+	elif collisions['top']:
+		player_y_momentum = 0
+	else:
+		air_timer += 1
 
 		# Scales display to same size as screen and thus scaling sprite size 
 	surf_transform = pygame.transform.scale(display, screen_size)
