@@ -19,9 +19,10 @@ BLUE   = (0  ,0  ,150)
 YELLOW = (230,200,0  )
 
 DARK_GREY = (20 ,20 ,20 )
+SUNSET    = (250,214,165)
 
 # ------- Init pygame ------------------ #
-pygame.init()
+pygame.init()                      #    pygame.FULLSCREEN
 screen = pygame.display.set_mode(screen_size, 0, 32)
 pygame.display.set_caption('Platformer Prototype')
 
@@ -33,13 +34,35 @@ clock = pygame.time.Clock()
 
 # ------- Load sprites ----------------- #
 
+	#--Background
+sunset = pygame.image.load('Sprites/Background/Sunset.png').convert()
+
 	#--Player
-player_idle_sprite = pygame.image.load('Sprites/Player/Player_Default_0.png')
-player_attack_sprite = pygame.image.load('Sprites/Player/Player_Attack_0.png')
+player_idle_sprite = [pygame.image.load('Sprites/Player/Default_0.png').convert(),
+					  pygame.image.load('Sprites/Player/Default_1.png').convert(),
+					  pygame.image.load('Sprites/Player/Default_2.png').convert()]
+
+for i in range(len(player_idle_sprite)):
+	player_idle_sprite[i].set_colorkey((0,0,0))
+
+player_attack_sprite = [pygame.image.load('Sprites/Player/Attack_0.png').convert(),
+						pygame.image.load('Sprites/Player/Attack_1.png').convert(),
+						pygame.image.load('Sprites/Player/Attack_2.png').convert()]
+
+for i in range(len(player_attack_sprite)):
+	player_attack_sprite[i].set_colorkey((0,0,0))
 
 	#-- Ground
-grass_sprite = pygame.image.load('Sprites/Ground/Grass.png')
-dirt_sprite  = pygame.image.load('Sprites/Ground/Dirt.png')
+grass_sprite = pygame.image.load('Sprites/Ground/Grass_new.png').convert()
+dirt_sprite  = pygame.image.load('Sprites/Ground/Dirt_new.png').convert()
+
+grass_sprite.set_colorkey((0,0,0)) 
+dirt_sprite.set_colorkey((0,0,0))
+
+	#-- Crosshair
+crosshair = pygame.image.load('Sprites/Crosshair/Crosshair.png').convert()
+
+crosshair.set_colorkey((255,255,255))
 
 	#-- Tile size
 tile_size_x, tile_size_y = dirt_sprite.get_size()
@@ -64,10 +87,14 @@ jump_force = -5.5
 air_timer = 0
 jump_count = 0
 
-player_rect = pygame.Rect((50,50), (player_idle_sprite.get_width(), player_idle_sprite.get_height()))
+player_rect = pygame.Rect((50,50), (player_idle_sprite[0].get_width(), player_idle_sprite[0].get_height()))
 
 moving_right = False
 moving_left = False
+jumping = False
+
+sprite_tracker = 0
+sprite_to_play = 0
 
 
 # ------- Functions ------------------- #
@@ -118,8 +145,25 @@ while True:
 
 	tile_rects = []
 
+	# --Sprite animation tracker
+	if sprite_tracker < 10:
+		sprite_to_play = 0
+	elif sprite_tracker < 20:
+		sprite_to_play = 1
+	elif sprite_tracker < 40:
+		sprite_to_play = 2
+	elif sprite_tracker < 50:
+		sprite_to_play = 1
+	elif sprite_tracker < 70:
+		sprite_to_play = 0
+	else:
+		sprite_tracker = 0
+
+	sprite_tracker += 1
+
+
 	# --Reset display
-	display.fill(DARK_GREY)
+	display.blit(sunset, (0,0))
 	
 	# --Set fps
 	clock.tick(fps)
@@ -154,6 +198,9 @@ while True:
 			if event.key == pygame.K_SPACE:
 				if air_timer < 6:
 					player_y_momentum += jump_force
+				# 	jumping = True
+				# else:
+				# 	jumping = False
 
 		if event.type == pygame.KEYUP:
 			if event.key == pygame.K_a or event.key == pygame.K_LEFT:
@@ -180,10 +227,13 @@ while True:
 
 	# --Display player 
 	if player_attacks:
-		display.blit(player_attack_sprite, (player_rect.x, player_rect.y))
+		display.blit(player_attack_sprite[sprite_to_play], (player_rect.x, player_rect.y))
 	else:										 # Have to divide by two because display is half the
-		display.blit(player_idle_sprite, (player_rect.x, player_rect.y)) # size of screen and is just scaled to screen size
+		display.blit(player_idle_sprite[sprite_to_play], (player_rect.x, player_rect.y)) # size of screen and is just scaled to screen size
 
+
+	# --Display crosshair          Divided by 2 because display scaled to screen size and its double its size
+	display.blit(crosshair, (mouse_x/2 - 3, mouse_y/2 - 3))
 
 	# --Player movement
 	player_movement = [0, 0]
@@ -201,13 +251,18 @@ while True:
 	player_rect, collisions = move_player(player_rect, player_movement, tile_rects)
 
 		# --Jumping
+	# if jumping:
+	# 	player_y_momentum += jump_force
 	if collisions['bottom']:
 		player_y_momentum = 0
 		air_timer = 0
+		jumping = False
 	elif collisions['top']:
 		player_y_momentum = 0
 	else:
 		air_timer += 1
+
+
 
 		# Scales display to same size as screen and thus scaling sprite size 
 	surf_transform = pygame.transform.scale(display, screen_size)
